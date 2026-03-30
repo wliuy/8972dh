@@ -14,7 +14,7 @@
     <!-- 统计信息 -->
     <div class="stats-bar">
        <div class="stat-info">
-        💡 提示：v2.3.8 修复按钮文字显示问题，回归左图右字横向精致布局。
+        💡 提示：v2.5.0 成功集成 Emoji 快捷选择器，并保留了精致的左图右字横向预览布局。
       </div>
     </div>
 
@@ -85,8 +85,24 @@
             <input v-model="formData.name" required placeholder="例如：常用工具" class="form-input">
           </div>
           <div class="form-group">
-            <label>分类图标 (Emoji) *:</label>
-            <input v-model="formData.icon" required placeholder="粘贴一个 Emoji，如 🛠️" class="form-input">
+            <label>分类图标 * (点击下方 Emoji 快速选择):</label>
+            <div class="icon-input-wrapper">
+              <input v-model="formData.icon" required placeholder="输入或点击下方图标" class="form-input icon-input">
+              <span class="icon-preview">{{ formData.icon }}</span>
+            </div>
+            
+            <!-- 🌟 恢复的 Emoji 快捷选择面板 -->
+            <div class="emoji-picker">
+              <span 
+                v-for="emoji in commonEmojis" 
+                :key="emoji" 
+                class="emoji-item"
+                @click="formData.icon = emoji"
+                :class="{ active: formData.icon === emoji }"
+              >
+                {{ emoji }}
+              </span>
+            </div>
           </div>
           <div class="form-actions">
             <button type="button" @click="closeModal" class="cancel-btn">取消</button>
@@ -99,7 +115,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import draggable from 'vuedraggable'
 
 const props = defineProps({
@@ -113,12 +129,25 @@ const showAddModal = ref(false)
 const editingCategory = ref(null)
 const formData = ref({ name: '', icon: '' })
 
+// 🌟 精选的 Emoji 候选池
+const commonEmojis = [
+  '⭐', '🔥', '🔗', '🛠️', '📁', '📁', '💻', '🎮', '🎬', '🎵', 
+  '📚', '🎨', '🔍', '⚙️', '💼', '🏠', '🌍', '📱', '☁️', '💡',
+  '🛍️', '🍎', '🍵', '⚡', '🚀', '🎁', '📅', '💬', '🔐', '📸'
+]
+
 // 同步父组件传入的分类数据
 watch(() => props.categories, (val) => {
   localCategories.value = JSON.parse(JSON.stringify(val))
 }, { immediate: true, deep: true })
 
 const syncToParent = () => emit('update', localCategories.value)
+
+const dragOptions = computed(() => ({
+  animation: 250,
+  ghostClass: "sortable-ghost",
+  handle: ".drag-handle"
+}))
 
 // 🌟 辅助逻辑：识别 SVG 代码
 const isSvg = (icon) => icon && icon.trim().toLowerCase().startsWith('<svg')
@@ -171,7 +200,7 @@ const saveCategory = () => {
   closeModal()
 }
 
-const openAddModal = () => { showAddModal.value = true; formData.value = { name: '', icon: '' }; }
+const openAddModal = () => { showAddModal.value = true; formData.value = { name: '', icon: '📁' }; }
 const closeModal = () => { showAddModal.value = false; editingCategory.value = null; }
 
 const moveUp = (idx) => { 
@@ -302,6 +331,22 @@ const handleSave = () => emit('save')
 .form-input { padding: 12px 16px; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 15px; outline: none; transition: border-color 0.2s; }
 .form-input:focus { border-color: #3498db; }
 
+/* 🌟 恢复：Emoji 面板样式 */
+.icon-input-wrapper { display: flex; gap: 10px; align-items: center; }
+.icon-input { flex: 1; }
+.icon-preview { width: 42px; height: 42px; background: #f8fafc; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; border: 1px solid #e2e8f0; }
+
+.emoji-picker { 
+  display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; 
+  padding: 12px; background: #f8fafc; border-radius: 10px; border: 1px solid #edf2f7;
+}
+.emoji-item { 
+  cursor: pointer; font-size: 18px; text-align: center; padding: 5px; 
+  border-radius: 6px; transition: background 0.2s;
+}
+.emoji-item:hover { background: #e2e8f0; transform: scale(1.2); }
+.emoji-item.active { background: #3498db; color: white; }
+
 .form-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 10px; padding-top: 20px; border-top: 1px solid #f1f5f9; }
 .cancel-btn { padding: 10px 20px; border-radius: 8px; border: 1px solid #e2e8f0; background: #fff; cursor: pointer; color: #64748b; font-weight: 500; }
 .submit-btn { padding: 10px 25px; background: #27ae60; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
@@ -330,6 +375,8 @@ const handleSave = () => emit('save')
   }
   .mini-site-tag { height: 38px; border-radius: 4px; box-shadow: none; border-color: #edf2f7; }
   .mini-site-name { font-size: 10px; padding: 0 6px; }
+
+  .emoji-picker { grid-template-columns: repeat(6, 1fr); }
   
   /* 🌟 核心修复：手机端操作按钮改为 2x2 网格，确保汉字完整显示 */
   .category-actions { margin-left: 0; width: 100%; align-items: stretch; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f1f5f9; }
@@ -360,5 +407,6 @@ const handleSave = () => emit('save')
 @media (max-width: 360px) {
   .category-sites-preview { grid-template-columns: 1fr; }
   .action-buttons button { font-size: 12px; }
+  .emoji-picker { grid-template-columns: repeat(5, 1fr); }
 }
 </style>
