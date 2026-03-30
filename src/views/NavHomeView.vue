@@ -3,7 +3,7 @@
   <div v-if="isLocked && !isUnlocked" class="lock-container">
     <div class="lock-box">
       <h1>🔐 访问验证</h1>
-      <!-- 2026-03-30 v2.3.6 视觉最终校准：高度锁定(PC 90/Mob 60)，图标100%自适应高度，信息区垂直居中 -->
+      <!-- 2026-03-30 v2.4.0 视觉完全体：找回鼠标悬浮光晕，维持大字号、顶部对齐与间距 -->
       <p class="lock-description">此导航站已启用访问保护</p>
       <form @submit.prevent="handleUnlock">
         <div class="form-group">
@@ -32,7 +32,6 @@
     <!-- 左侧边栏 -->
     <aside class="sidebar">
       <div class="logo-section">
-        <!-- 🌟 侧边栏 Logo 替换为自定义图片 -->
         <img src="/logo.png" class="logo" alt="Logo">
         <h1 class="site-title">{{ title || '8972导航' }}</h1>
       </div>
@@ -93,7 +92,6 @@
           />
         </div>
 
-        <!-- 主题切换按钮 -->
         <button class="theme-toggle-btn" @click="themeStore.toggleTheme" :title="themeStore.isDarkMode ? '切换到日间模式' : '切换到夜间模式'">
           <svg v-if="!themeStore.isDarkMode" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 18C8.68629 18 6 15.3137 6 12C6 8.68629 8.68629 6 12 6C15.3137 6 18 8.68629 18 12C18 15.3137 15.3137 18 12 18ZM12 16C14.2091 16 16 14.2091 16 12C16 9.79086 14.2091 8 12 8C9.79086 8 8 9.79086 8 12C8 14.2091 9.79086 16 12 16ZM11 1H13V4H11V1ZM11 20H13V23H11V20ZM3.51472 4.92893L4.92893 3.51472L7.05025 5.63604L5.63604 7.05025L3.51472 4.92893ZM16.9497 18.364L18.364 16.9497L20.4853 19.0711L19.0711 20.4853L16.9497 18.364ZM19.0711 3.51472L20.4853 4.92893L18.364 7.05025L16.9497 5.63604L19.0711 3.51472ZM5.63604 16.9497L7.05025 18.364L4.92893 20.4853L3.51472 19.0711L5.63604 16.9497ZM23 11V13H20V11H23ZM4 11V13H1V11H4Z"/>
@@ -131,25 +129,21 @@
           </ul>
         </div>
 
-        <!-- 移动端菜单遮罩 -->
         <div class="mobile-menu-overlay" :class="{ active: showMobileMenu }" @click="closeMobileMenu"></div>
       </header>
 
       <!-- 导航内容区 -->
       <div class="content-area">
-        <!-- 加载状态 -->
         <div v-if="loading" class="loading">
           <div class="loading-spinner"></div>
           <p>加载中...</p>
         </div>
 
-        <!-- 错误状态 -->
         <div v-else-if="error" class="error">
           <p>{{ error }}</p>
           <button @click="fetchCategories" class="retry-btn">重试</button>
         </div>
 
-        <!-- 分类内容 -->
         <div v-else class="categories-container">
           <section
             v-for="category in categories"
@@ -391,7 +385,7 @@ onUnmounted(() => {
 /* 🌟 PC端卡片网格 */
 .sites-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
 
-/* 🌟 PC端卡片高度：强制锁定 90px */
+/* 🌟 PC端卡片高度：锁定 90px */
 .site-card {
   display: flex !important;
   align-items: stretch !important;
@@ -406,9 +400,28 @@ onUnmounted(() => {
   overflow: hidden;
   height: 90px !important;
 }
-.site-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); }
 
-/* 🌟 图标容器：不设固定宽度，100% 适应卡片高度并保持正方形 */
+/* 🌟 核心修正：找回鼠标悬浮光晕效果 */
+.site-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(52, 152, 219, 0.1), rgba(155, 89, 182, 0.1));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 0; /* 在背景层 */
+}
+
+.site-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); }
+.site-card:hover::before { opacity: 1; }
+
+/* 确保内容在光晕之上 */
+.site-icon, .site-info { position: relative; z-index: 1; }
+
+/* 图标容器：PC端 90px */
 .site-icon {
   height: 100% !important; 
   aspect-ratio: 1 / 1 !important; 
@@ -421,20 +434,30 @@ onUnmounted(() => {
 }
 .site-icon img, .site-icon :deep(svg) { width: 100% !important; height: 100% !important; object-fit: cover !important; display: block; }
 
-/* 🌟 信息区域：垂直居中展示，防止文字遮挡 */
+/* 🌟 信息区域：顶部对齐 */
 .site-info {
   flex: 1;
   min-width: 0;
-  padding: 8px 14px !important;
+  padding: 10px 14px !important; 
   display: flex;
   flex-direction: column;
-  justify-content: center; /* 🌟 垂直居中 */
+  justify-content: flex-start; 
 }
-.site-name { font-size: 15px !important; font-weight: 600; margin: 0 0 2px 0 !important; color: #2c3e50; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* 站点介绍：标准 11px，支持 3 行显示 */
+.site-name { 
+  font-size: 15px !important; 
+  font-weight: 600; 
+  margin: 0 0 5px 0 !important; 
+  color: #2c3e50; 
+  line-height: 1.2; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  white-space: nowrap; 
+}
+
+/* 站点介绍：调大字号为 12px */
 .site-description {
-  font-size: 11px !important;
+  font-size: 12px !important;
   color: #7f8c8d;
   margin: 0;
   line-height: 1.4;
@@ -446,7 +469,7 @@ onUnmounted(() => {
   text-overflow: ellipsis;
 }
 
-/* 🌟 手机端适配：一行两列，高度 60px */
+/* 🌟 手机端适配 */
 @media (max-width: 768px) {
   .sidebar { display: none; }
   .main-content { margin-left: 0; height: 100vh; height: 100svh; overflow: hidden; }
@@ -454,21 +477,17 @@ onUnmounted(() => {
   .content-area { padding: 15px 12px; padding-top: 85px; padding-bottom: 200px; }
   .mobile-menu-btn { display: block; }
 
-  /* 网格保持 2 列 */
   .sites-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
-  
-  /* 🌟 核心修改：手机端卡片高度强制改为 60px */
   .site-card { height: 60px !important; border-radius: 8px; }
   
-  /* 🌟 手机端图标同步适应 100% 高度 */
-  .site-card .site-icon { height: 100% !important; aspect-ratio: 1 / 1 !important; }
+  .site-card .site-info { padding: 6px 10px !important; justify-content: flex-start; }
   
-  /* 手机端信息区极致紧凑且垂直居中 */
-  .site-card .site-info { padding: 4px 10px !important; justify-content: center; }
-  .site-card .site-name { font-size: 13px !important; margin-bottom: 1px !important; }
+  .site-card .site-name { 
+    font-size: 13px !important; 
+    margin-bottom: 3px !important; 
+  }
   
-  /* 60px 高度下，介绍文字强制缩减为 1 行 */
-  .site-card .site-description { font-size: 9.5px !important; -webkit-line-clamp: 1 !important; }
+  .site-card .site-description { font-size: 11px !important; -webkit-line-clamp: 1 !important; }
   
   .category-title { font-size: 20px; margin-bottom: 12px; }
 }
@@ -480,6 +499,7 @@ onUnmounted(() => {
 .dark .sidebar, .dark .search-header, .dark .mobile-menu { background-color: #1e293b; color: #e2e8f0; }
 .dark .theme-toggle-btn, .dark .mobile-menu-btn { color: #e2e8f0; }
 .dark .site-card { background: #374151 !important; border: 1px solid #4b5563; color: #e2e8f0; }
+.dark .site-card::before { background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.15)); }
 .dark .site-name { color: #e2e8f0; }
 .dark .site-description { color: #9ca3af; }
 .dark .category-title { color: #e2e8f0; }

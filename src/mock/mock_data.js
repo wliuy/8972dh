@@ -24,7 +24,7 @@ export const mockData = {
           "id": "site-1773219311137",
           "name": "云享资源站",
           "url": "https://89729981.xyz",
-          "description": "站长的分享汇总，包含24T国内外经典电影网盘资源，影音、手机、电脑各种破解版软件福利资源；",
+          "description": "站长的分享汇总，包含各种破解版资源；",
           "icon": ""
         }
       ]
