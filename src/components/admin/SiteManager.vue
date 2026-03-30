@@ -32,7 +32,7 @@
         <span class="stat-label">当前显示</span>
       </div>
       <div class="stat-info">
-        💡 提示：v2.3.1 深度适配手机端布局，解决按钮遮挡文字与文字消失问题。
+        💡 提示：v2.4.8 已锁定物理索引替换逻辑，确保编辑站点内容后其位置绝对不跳变。
       </div>
     </div>
 
@@ -54,7 +54,6 @@
             <!-- 站点卡片主体 -->
             <div class="site-card">
               <div class="site-icon">
-                <!-- 🌟 增强渲染：支持 SVG 识别，且自动回退到 /logo.png -->
                 <div v-if="isSvg(site.icon)" v-html="site.icon" class="svg-icon-wrapper"></div>
                 <img v-else :src="ensureIcon(site.icon)" :alt="site.name" @error="handleImageError">
               </div>
@@ -144,6 +143,7 @@ const editingSite = ref(null)
 
 const formData = ref({ name: '', url: '', description: '', icon: '', categoryId: '' })
 
+// 同步数据
 watch(() => props.categories, (val) => { 
   localCategories.value = JSON.parse(JSON.stringify(val)) 
 }, { immediate: true, deep: true })
@@ -154,10 +154,8 @@ watch(() => props.initialSelectedCategoryId, (val) => {
 
 const syncToParent = () => emit('update', localCategories.value)
 
-// 🌟 辅助函数：判断是否为 SVG 代码
 const isSvg = (icon) => icon && icon.trim().toLowerCase().startsWith('<svg')
 
-// 🌟 辅助函数：确保图标有值，如果是空值或空格则直接返回 logo.png
 const ensureIcon = (icon) => {
   if (!icon || icon.trim() === '') return '/logo.png'
   return icon
@@ -180,7 +178,8 @@ const currentPageSites = computed({
     if (!selectedCategoryId.value) return
     const cat = localCategories.value.find(c => c.id === selectedCategoryId.value)
     if (cat) {
-      cat.sites = newSites.map(s => ({ id: s.id, name: s.name, url: s.url, description: s.description, icon: s.icon }))
+      // 使用 ...s 展开运算符，保留所有原始属性
+      cat.sites = newSites.map(s => ({ ...s }))
       syncToParent()
     }
   }
@@ -209,35 +208,70 @@ const deleteSite = (site) => {
   }
 }
 
-const onDragEnd = () => console.log('排序已更新')
+const onDragEnd = () => console.log('排序已同步')
 
 const autoDetectIcon = async () => {
   if (!formData.value.url) return
   try {
     const host = new URL(formData.value.url).host
-    // 恢复纯 URL 存储方式
     formData.value.icon = `https://www.faviconextractor.com/favicon/${host}`
-  } catch (e) { console.error('URL解析失败') }
+  } catch (e) { console.error('获取图标失败') }
 }
 
+/**
+ * 🌟 核心逻辑：保存站点 (v2.4.8)
+ * 物理索引原地替换法，彻底解决修改后跳变到末尾的问题。
+ */
 const saveSite = () => {
-  const cat = localCategories.value.find(c => c.id === formData.value.categoryId)
-  if (!cat) return
-  const siteData = { 
-    id: editingSite.value?.id || `site-${Date.now()}`, 
-    name: formData.value.name, 
-    url: formData.value.url, 
-    description: formData.value.description, 
-    icon: formData.value.icon 
-  }
+  const targetCatId = formData.value.categoryId
+  const targetCat = localCategories.value.find(c => c.id === targetCatId)
+  if (!targetCat) return
+
+  const isEditing = !!editingSite.value
+  const siteId = isEditing ? editingSite.value.id : `site-${Date.now()}`
+
+  // 1. 构造新数据，克隆原始对象以继承可能存在的排序权重或其他隐藏元数据
+  const siteData = isEditing 
+    ? { ...editingSite.value, ...formData.value, id: siteId }
+    : { ...formData.value, id: siteId }
   
-  if (editingSite.value) {
-    localCategories.value.forEach(c => { 
-      if (c.sites) c.sites = c.sites.filter(s => s.id !== siteData.id) 
-    })
+  // 必须移除从 allSites 带入的冗余 categoryId 字段，保持 mock_data 数据结构纯净
+  delete siteData.categoryId
+
+  if (isEditing) {
+    let siteProcessed = false
+    
+    // 2. 深度物理扫描所有分类，寻找该站点真实所在的数组和位置
+    for (const cat of localCategories.value) {
+      if (!cat.sites) continue
+      const index = cat.sites.findIndex(s => s.id === siteId)
+      
+      if (index !== -1) {
+        siteProcessed = true
+        if (cat.id === targetCatId) {
+          // 【场景 A】：分类未变 -> 采用物理索引原地替换，Vue 响应式保证顺序 100% 不动
+          cat.sites.splice(index, 1, siteData)
+        } else {
+          // 【场景 B】：分类变更 -> 从旧分类数组物理剥离
+          cat.sites.splice(index, 1)
+          // 追加到新分类末尾
+          if (!targetCat.sites) targetCat.sites = []
+          targetCat.sites.push(siteData)
+        }
+        break 
+      }
+    }
+    
+    // 容错：若未扫描到位置（理论不发生），则追加
+    if (!siteProcessed) {
+      if (!targetCat.sites) targetCat.sites = []
+      targetCat.sites.push(siteData)
+    }
+  } else {
+    // 【场景 C】：纯新增站点 -> 追加到选定分类末尾
+    if (!targetCat.sites) targetCat.sites = []
+    targetCat.sites.push(siteData)
   }
-  if (!cat.sites) cat.sites = []
-  cat.sites.push(siteData)
   
   syncToParent()
   closeModal()
@@ -253,10 +287,8 @@ const closeModal = () => {
   editingSite.value = null
 }
 
-// 🌟 核心修复：刷新死循环的极致报错处理
 const handleImageError = (e) => { 
   if (e.target.dataset.tried === 'true') {
-    // 熔断机制：如果 logo.png 也加载失败，显示透明占位并隐藏图片，防止无限刷新
     e.target.style.display = 'none';
     e.target.parentNode.style.backgroundColor = '#f5f5f5';
     return;
@@ -265,11 +297,7 @@ const handleImageError = (e) => {
   e.target.src = '/logo.png'; 
 }
 
-const handleSave = async () => {
-  try {
-    emit('save')
-  } catch (e) { console.error('保存失败') }
-}
+const handleSave = () => emit('save')
 </script>
 
 <style scoped>
@@ -278,15 +306,8 @@ const handleSave = async () => {
 .header-actions { display: flex; gap: 10px; }
 .category-filter { padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; background: #fff; }
 
-/* 🌟 解决顶部按钮文字在手机端消失问题 */
-.add-btn { 
-  background: #27ae60; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; 
-  font-weight: 500; white-space: nowrap; flex-shrink: 0; min-width: fit-content;
-}
-.save-btn { 
-  background: #3498db; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; 
-  font-weight: 500; white-space: nowrap; flex-shrink: 0; min-width: fit-content;
-}
+.add-btn { background: #27ae60; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
+.save-btn { background: #3498db; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
 .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .stats-bar { display: flex; gap: 20px; margin-bottom: 20px; align-items: center; background: #fff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); flex-wrap: wrap; }
@@ -295,93 +316,22 @@ const handleSave = async () => {
 .stat-label { font-size: 12px; color: #999; }
 .stat-info { font-size: 13px; color: #666; margin-left: auto; }
 
-.admin-sites-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 16px;
-}
-
+.admin-sites-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
 .admin-site-card-wrapper { position: relative; }
+.admin-drag-handle { position: absolute; left: -8px; top: 50%; transform: translateY(-50%); cursor: move; color: #ccc; font-size: 18px; z-index: 5; padding: 10px 4px; }
 
-.admin-drag-handle {
-  position: absolute;
-  left: -8px;
-  top: 50%;
-  transform: translateY(-50%);
-  cursor: move;
-  color: #ccc;
-  font-size: 18px;
-  z-index: 5;
-  padding: 10px 4px;
-}
+.site-card { display: flex; align-items: stretch; background: white; border-radius: 12px; border: 1px solid #eee; height: 90px; overflow: hidden; position: relative; transition: all 0.3s ease; }
+.site-card:hover { box-shadow: 0 8px 20px rgba(0,0,0,0.1); border-color: #3498db; }
 
-.site-card {
-  display: flex;
-  align-items: stretch;
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #eee;
-  height: 90px;
-  overflow: hidden;
-  position: relative;
-  transition: all 0.3s ease;
-}
-
-.site-card:hover {
-  box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-  border-color: #3498db;
-}
-
-.site-icon {
-  aspect-ratio: 1 / 1 !important;
-  height: 100% !important;
-  background: #fcfcfc;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-}
-
-.site-icon img, .site-icon :deep(svg) {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-  display: block;
-}
-
+.site-icon { aspect-ratio: 1 / 1 !important; height: 100% !important; background: #fcfcfc; flex-shrink: 0; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+.site-icon img, .site-icon :deep(svg) { width: 100% !important; height: 100% !important; object-fit: cover !important; display: block; }
 .svg-icon-wrapper { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
 
-.site-info {
-  flex: 1;
-  padding: 10px 14px;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  min-width: 0;
-  background: white;
-}
-
+.site-info { flex: 1; padding: 10px 14px; display: flex; flex-direction: column; justify-content: flex-start; min-width: 0; background: white; }
 .site-name { font-size: 15px; font-weight: 600; margin: 2px 0; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .site-description { font-size: 11px; color: #999; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
-.card-admin-actions {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 90px;
-  background: rgba(255,255,255,0.9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 15px;
-  opacity: 0;
-  transition: opacity 0.2s;
-  backdrop-filter: blur(2px);
-}
-
+.card-admin-actions { position: absolute; top: 0; right: 0; bottom: 0; left: 90px; background: rgba(255,255,255,0.9); display: flex; align-items: center; justify-content: center; gap: 15px; opacity: 0; transition: opacity 0.2s; backdrop-filter: blur(2px); }
 .site-card:hover .card-admin-actions { opacity: 1; }
 
 .mini-btn { border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; }
@@ -391,7 +341,7 @@ const handleSave = async () => {
 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
 .modal-content { background: white; padding: 25px; border-radius: 12px; width: 500px; max-width: 95%; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
-.close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: #999; }
+.close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: #94a3b8; }
 
 .site-form { display: flex; flex-direction: column; gap: 15px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
@@ -401,52 +351,25 @@ const handleSave = async () => {
 
 .icon-input-group { display: flex; gap: 8px; }
 .auto-icon-btn { background: #3498db; color: white; border: none; padding: 0 15px; border-radius: 8px; cursor: pointer; }
-
 .icon-preview-box { margin-top: 5px; width: 64px; height: 64px; border: 1px solid #eee; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #fafafa; position: relative; }
 .icon-preview-box img, .svg-preview :deep(svg) { width: 100%; height: 100%; object-fit: contain; }
 
 .form-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 15px; }
 .submit-btn { padding: 10px 25px; background: #27ae60; color: white; border: none; border-radius: 8px; cursor: pointer; }
 
-/* 🌟 手机端深度适配修复 */
 @media (max-width: 768px) {
-  /* 解决顶部拥挤：强制两行排列 */
   .manager-header { flex-direction: column; align-items: flex-start; gap: 12px; }
   .header-actions { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
   .category-filter { flex: 1; min-width: 120px; }
   .add-btn, .save-btn { flex: 1; text-align: center; }
-
   .stat-info { width: 100%; margin-top: 10px; text-align: left; }
   .admin-sites-grid { grid-template-columns: 1fr; gap: 12px; }
-  
-  /* 🌟 核心修复：解决手机端无法悬停编辑且遮挡文字的问题 */
-  /* 让卡片变窄一点，为右侧操作区留位 */
   .site-card { height: 80px; }
   .site-icon { height: 80px; width: 80px; }
-
-  .card-admin-actions { 
-    position: relative; /* 改为相对定位，作为卡片的一个侧边栏 */
-    left: 0;
-    width: 60px; /* 固定宽度 */
-    height: 100%;
-    opacity: 1; /* 始终可见 */
-    background: #f8fafc;
-    border-left: 1px solid #eee;
-    flex-direction: column;
-    gap: 8px;
-    padding: 0 5px;
-    backdrop-filter: none;
-  }
-  
+  .card-admin-actions { position: relative; left: 0; width: 60px; height: 100%; opacity: 1; background: #f8fafc; border-left: 1px solid #eee; flex-direction: column; gap: 8px; padding: 0 5px; backdrop-filter: none; }
   .mini-btn { width: 30px; height: 30px; font-size: 14px; }
   .site-info { padding: 8px 12px; }
   .site-name { font-size: 14px; }
   .site-description { -webkit-line-clamp: 2; font-size: 10px; }
-}
-
-/* 🌟 超窄手机屏幕适配 */
-@media (max-width: 360px) {
-  .header-actions { flex-direction: column; align-items: stretch; }
-  .add-btn, .save-btn { width: 100%; }
 }
 </style>
