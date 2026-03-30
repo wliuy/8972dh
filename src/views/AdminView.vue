@@ -4,6 +4,7 @@
     <div v-if="!isAuthenticated" class="login-container">
       <div class="login-box">
         <h1>🔐 管理员登录</h1>
+        <!-- 2026-03-30 v2.3.7 视觉重构：手机端后台导航改为横向滑动排列 -->
         <form @submit.prevent="handleLogin">
           <div class="form-group">
             <label for="password">管理密钥:</label>
@@ -52,6 +53,7 @@
           </div>
         </div>
 
+        <!-- 🌟 核心修改点：横向排列的 Tab 容器 -->
         <div class="admin-tabs">
           <button
             class="tab-btn"
@@ -567,41 +569,8 @@ onMounted(() => {
   font-size: 14px;
 }
 
-.emergency-btn {
+.emergency-btn, .debug-btn, .logout-btn {
   padding: 8px 16px;
-  background: #e74c3c;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.3s ease;
-  margin-right: 15px;
-}
-
-.emergency-btn:hover {
-  background: #c0392b;
-}
-
-.debug-btn {
-  padding: 8px 16px;
-  background: #f39c12;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.3s ease;
-  margin-right: 15px;
-}
-
-.debug-btn:hover {
-  background: #e67e22;
-}
-
-.logout-btn {
-  padding: 8px 16px;
-  background: #e74c3c;
   color: white;
   border: none;
   border-radius: 4px;
@@ -610,9 +579,12 @@ onMounted(() => {
   transition: background-color 0.3s ease;
 }
 
-.logout-btn:hover {
-  background: #c0392b;
-}
+.emergency-btn { background: #e74c3c; margin-right: 15px; }
+.emergency-btn:hover { background: #c0392b; }
+.debug-btn { background: #f39c12; margin-right: 15px; }
+.debug-btn:hover { background: #e67e22; }
+.logout-btn { background: #e74c3c; }
+.logout-btn:hover { background: #c0392b; }
 
 .admin-main {
   max-width: 1200px;
@@ -701,7 +673,6 @@ onMounted(() => {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-/* 跳过加载按钮样式 */
 .skip-loading-btn {
   margin-top: 20px;
   padding: 10px 20px;
@@ -714,11 +685,7 @@ onMounted(() => {
   transition: background-color 0.3s ease;
 }
 
-.skip-loading-btn:hover {
-  background: #e67e22;
-}
-
-/* 响应式设计 */
+/* 🌟 手机端深度适配：横向排列菜单 */
 @media (max-width: 768px) {
   .header-content {
     padding: 15px 20px;
@@ -732,12 +699,27 @@ onMounted(() => {
     padding: 20px 15px;
   }
 
+  /* 🌟 核心修改：强制横向排列并支持滑动 */
   .admin-tabs {
-    flex-direction: column;
+    flex-direction: row !important; /* 强制横排 */
+    overflow-x: auto; /* 允许横向滚动 */
+    padding: 8px;
+    gap: 10px;
+    -webkit-overflow-scrolling: touch; /* 流畅滚动 */
+    /* 隐藏滚动条 */
+    scrollbar-width: none; 
+  }
+  
+  .admin-tabs::-webkit-scrollbar {
+    display: none;
   }
 
   .tab-btn {
-    margin-bottom: 5px;
+    margin-bottom: 0;
+    white-space: nowrap; /* 禁止文字折行 */
+    flex: 0 0 auto; /* 禁止压缩，保持内容宽度 */
+    padding: 10px 15px;
+    font-size: 13px;
   }
 }
 </style>
