@@ -2,7 +2,7 @@ export const mockData = {
   "categories": [
     {
       "id": "category-1773104809124",
-      "icon": "💼",
+      "icon": "🍵",
       "name": "常用网站",
       "order": 0,
       "sites": [
@@ -32,7 +32,7 @@ export const mockData = {
     {
       "id": "tools",
       "name": "在线工具",
-      "icon": "⚙️",
+      "icon": "🌍",
       "order": 1,
       "sites": [
         {
@@ -60,7 +60,7 @@ export const mockData = {
     },
     {
       "id": "category-1773220672825",
-      "icon": "👥",
+      "icon": "🔭",
       "name": "导航博客",
       "order": 2,
       "sites": [
@@ -110,7 +110,7 @@ export const mockData = {
     },
     {
       "id": "category-1773220621150",
-      "icon": "📊",
+      "icon": "🤖",
       "name": "AI 工具",
       "order": 3,
       "sites": [
