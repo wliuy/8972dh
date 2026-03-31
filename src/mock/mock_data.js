@@ -2,7 +2,7 @@ export const mockData = {
   "categories": [
     {
       "id": "category-1773104809124",
-      "icon": "🍵",
+      "icon": "🍎",
       "name": "常用网站",
       "order": 0,
       "sites": [
