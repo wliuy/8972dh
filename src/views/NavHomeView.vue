@@ -34,6 +34,7 @@
       <div class="logo-section">
         <!-- 🌟 侧边栏 Logo 替换为自定义图片 -->
         <img src="/logo.png" class="logo" alt="Logo">
+        <!-- 🌟 SEO 优化：网站标题作为 H1 -->
         <h1 class="site-title">{{ title || '8972导航' }}</h1>
       </div>
 
@@ -157,6 +158,7 @@
             class="category-section"
             :id="`category-${category.id}`"
           >
+            <!-- 🌟 SEO 优化：分类名使用 H2 -->
             <h2 class="category-title">
               <span class="category-icon">{{ category.icon }}</span>
               <span class="category-name">{{ category.name }}</span>
@@ -176,6 +178,7 @@
                   <img v-else :src="site.icon || '/logo.png'" :alt="site.name" @error="handleImageError" />
                 </div>
                 <div class="site-info">
+                  <!-- 🌟 SEO 优化：站点名使用 H3 -->
                   <h3 class="site-name">{{ site.name }}</h3>
                   <p class="site-description">{{ site.description }}</p>
                 </div>
@@ -189,7 +192,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useNavigation } from '@/apis/useNavigation.js'
 import { useThemeStore } from '@/stores/counter.js'
 import googleLogo from '@/assets/goolge.png'
@@ -216,6 +219,44 @@ const searchEngines = {
   bing: { url: 'https://www.bing.com/search?q=', icon: bingLogo, placeholder: 'Bing (点logo切换搜索引擎)' },
   duckduckgo: { url: 'https://duckduckgo.com/?q=', icon: duckLogo, placeholder: 'DuckDuckGo (点logo切换搜索引擎)' }
 }
+
+/**
+ * 🌟 核心 SEO 动态注入逻辑
+ * 会根据后台设置的标题和当前分类名自动更新网页元数据
+ */
+const refreshSEO = () => {
+  // 1. 同步浏览器标签页标题
+  const pageTitle = title.value || '8972导航';
+  document.title = pageTitle;
+  
+  // 2. 动态生成网页描述 (提取前 5 个分类名)
+  if (categories.value && categories.value.length > 0) {
+    const catSummary = categories.value.slice(0, 5).map(c => c.name).join('、');
+    const dynamicDesc = `${pageTitle}是一个高效、纯净的个人导航站。涵盖${catSummary}等资源分类，助你快速定位常用资源。`;
+    
+    // 动态更新 meta description
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (!metaDesc) {
+      metaDesc = document.createElement('meta');
+      metaDesc.name = 'description';
+      document.head.appendChild(metaDesc);
+    }
+    metaDesc.setAttribute('content', dynamicDesc);
+
+    // 3. 动态更新 meta keywords
+    let metaKeywords = document.querySelector('meta[name="keywords"]');
+    const keywordsStr = `${pageTitle}, 网址导航, ${categories.value.map(c => c.name).join(', ')}`;
+    if (!metaKeywords) {
+      metaKeywords = document.createElement('meta');
+      metaKeywords.name = 'keywords';
+      document.head.appendChild(metaKeywords);
+    }
+    metaKeywords.setAttribute('content', keywordsStr);
+  }
+}
+
+// 🌟 监控数据变化：当标题或分类数据更新时，实时刷新 SEO 信息
+watch([title, categories], () => refreshSEO(), { deep: true });
 
 const smoothScrollTo = (container, targetTop, duration = 600) => {
   const startTop = container.scrollTop
@@ -306,6 +347,8 @@ const scrollToCategoryMobile = (categoryId) => {
 onMounted(async () => {
   checkLockStatus()
   await fetchCategories()
+  // 🌟 初次挂载加载数据后执行 SEO 刷新
+  refreshSEO()
   selectedEngine.value = defaultSearchEngine.value
 })
 
